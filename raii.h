@@ -1,35 +1,39 @@
+#ifndef RAII_H
+#define RAII_H
+
 #include <type_traits>
 #include <functional>
+#include <assert.h>
 
-typename<typename T>
+template<typename T>
 struct no_const
 {
 	using type = typename std::conditional<std::is_const<T>::value, typename std::remove_const<T>::type, T>::type;
 };
 
-class raii 
+class raii
 {
 public:
 	using fun_type = std::function<void()>;
-	explicit raii( fun_type release, fun_type acquire = [] {}, bool default_com = true )
+	explicit raii( fun_type release, fun_type acquire = [] {}, bool default_com = true )w
 	noexcept : _commit( default_com ), _release( release )
 	{
 		acquire();
 	}
-	
+
 	~raii() noexcept
 	{
-		if ( _commit ) 
+		if ( _commit )
 		{
 			_release();
 		}
 	}
-	
+
 	raii( raii&& rv ) noexcept : _commit( rv._commit ), _release( rv._release )
 	{
 		rv._commit = false;
 	}
-	
+
 	raii( const raii& ) = delete;
 	raii& operator = ( const raii& ) = delete;
 	raii& commit( bool c = true ) noexcept
@@ -50,14 +54,14 @@ public:
 	using _Self = raii_var<T>;
 	using acq_type = std::function<T()>;
 	using rel_type = std::function<void( T & )>;
-	
+
 	explicit raii_var( acq_type acquire, rel_type release ) noexcept : _resource( acquire() ), _release( release ) {}
-	
+
 	raii_var( raii_var&& rv ) : _resource( std::move( rv._resource ) ), _release( std::move( rv._release ) )
 	{
 		rv._commit = false;
 	}
-	
+
 	~raii_var() noexcept
 	{
 		if ( _commit )
@@ -65,16 +69,16 @@ public:
 			_release( _resource );
 		}
 	}
-	
+
 	_Self& commit( bool c = true ) noexcept
 	{
 		_commit = c;
 		return *this;
 	}
-	
+
 	T& get() noexcept { return _resource; }
 	T& operator*() noexcept { return get(); }
-	
+
 	template<typename _T = T>
 	typename std::enable_if<std::is_pointer<T>::value, _T>::type operator->() const noexcept
 	{
@@ -111,3 +115,5 @@ raii make_raii( RES& res, M_REL rel, bool default_com = true ) noexcept
     auto p_res = std::addressof( const_cast<typename no_const<RES>::type&> (res ) );
     return raii( std::bind( rel, p_res ), []{}, default_com );
 }
+
+#endif
